@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Šach proti AI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stockfish/stockfish.js"></script>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        #board { width: 400px; margin: auto; }
+    </style>
+</head>
+<body>
+    <h1>Šach proti AI</h1>
+    <div id="board"></div>
+    <h2 id="status">Hraj!</h2>
+    <button onclick="resetGame()">Resetovať hru</button>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const game = new Chess();
+            const board = Chessboard('board', {
+                draggable: true,
+                position: 'start',
+                onDrop: (source, target) => {
+                    const move = game.move({ from: source, to: target, promotion: 'q' });
+                    if (!move) return 'snapback';
+                    board.position(game.fen());
+                    updateStatus();
+                    setTimeout(makeAIMove, 500);
+                }
+            });
+
+            const stockfish = new Worker("https://cdn.jsdelivr.net/npm/stockfish/stockfish.js");
+
+            function makeAIMove() {
+                if (game.game_over()) return;
+                stockfish.postMessage("position fen " + game.fen());
+                stockfish.postMessage("go depth 10");
+                stockfish.onmessage = function(event) {
+                    const match = event.data.match(/bestmove (\S+)/);
+                    if (match) {
+                        game.move(match[1], { sloppy: true });
+                        board.position(game.fen());
+                        updateStatus();
+                    }
+                };
+            }
+
+            function updateStatus() {
+                const statusElement = document.getElementById('status');
+                if (game.in_checkmate()) {
+                    statusElement.innerText = 'Mat! Hra skončila.';
+                } else if (game.in_draw()) {
+                    statusElement.innerText = 'Remíza!';
+                } else {
+                    statusElement.innerText = 'Hraj!';
+                }
+            }
+
+            window.resetGame = function() {
+                game.reset();
+                board.position('start');
+                updateStatus();
+            };
+        });
+    </script>
+</body>
+</html>
